@@ -7,8 +7,7 @@ import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, CheckCheck, ChevronRi
 import { Sidebar } from "@/components/sidebar";
 import { PrismSymbol, ProviderMark } from "@/components/brand";
 import { PROVIDERS, type DebateEvent, type DebateMessage, type DebateMode, type DebateRound, type ProviderId } from "@/lib/debate";
-import { historyStorageKey, debateMarkdown, readHistory, readSettings, saveDebate, type SavedDebate } from "@/lib/client-store";
-import { notifyDebateComplete } from "@/lib/pwa";
+import { HISTORY_KEY, debateMarkdown, readHistory, readSettings, saveDebate, type SavedDebate } from "@/lib/client-store";
 
 const EXAMPLES = [
   { category: "기술과 미래", topic: "AI는 인간의 창의성을 대체할 수 있을까?", position: "AI는 기존의 정보를 조합하는 데 뛰어나지만, 인간의 경험과 감정에서 나오는 창의성을 완전히 대체하기는 어렵다고 생각합니다." },
@@ -140,7 +139,6 @@ export default function StudioPage() {
       const debate: SavedDebate = { id: debateId, topic: inputTopic, position: inputPosition, mode: selectedMode, createdAt, messages: collected, status };
       setResult(debate);
       if (collected.length) { try { setHistory(saveDebate(debate)); } catch { notify("브라우저 저장 공간이 부족해 기록을 저장하지 못했습니다. 내보내기를 이용해주세요."); } }
-      if (receivedComplete && debate.status === "complete") void notifyDebateComplete(inputTopic, debateId);
     }
   }
 
@@ -156,9 +154,9 @@ export default function StudioPage() {
   const hasResults = running || !!result;
 
   return <div className="app-shell">
-    <Sidebar history={history} onNew={newDebate} onHistory={() => { setMobileMenu(false); historyRef.current?.showModal(); }} onSelect={selectDebate} open={mobileMenu} onClose={() => setMobileMenu(false)}/>
-    <main className="main-shell" inert={mobileMenu || undefined}>
-      <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={() => setMobileMenu(true)} aria-label="메뉴 열기" aria-expanded={mobileMenu} aria-controls="main-sidebar"><Menu size={20}/></button><MessageSquare size={16}/><strong>토론 스튜디오</strong></div><div className="topbar-right"><Link className="icon-button" href="/settings" title="설정" aria-label="설정"><Settings2 size={18}/></Link></div></header>
+    <Sidebar history={history} onNew={newDebate} onHistory={() => historyRef.current?.showModal()} onSelect={selectDebate} open={mobileMenu} onClose={() => setMobileMenu(false)}/>
+    <main className="main-shell">
+      <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={() => setMobileMenu(true)} aria-label="메뉴 열기"><Menu size={20}/></button><MessageSquare size={16}/><strong>토론 스튜디오</strong></div><div className="topbar-right"><Link className="icon-button" href="/settings" title="설정" aria-label="설정"><Settings2 size={18}/></Link></div></header>
       <div className="page-inner">
         <section className="hero"><div><div className="eyebrow"><span/>A SPACE FOR BETTER THINKING</div><h1>AI의 <span>시선</span></h1><p>서로 다른 AI의 생각이 만나, 당신의 관점이 더 깊어집니다.</p></div><div className="hero-symbol" aria-hidden="true"><PrismSymbol className="hero-prism"/></div></section>
         <div className="setup-grid">
@@ -239,7 +237,7 @@ export default function StudioPage() {
         <footer className="page-footer"><span>서로 다른 생각이 만나는 곳, <strong>prism.</strong></span><span>Powered by curiosity<span className="footer-star">✳</span></span></footer>
       </div>
     </main>
-    <dialog ref={historyRef} className="history-dialog" aria-labelledby="history-title"><div className="dialog-header"><div><span className="eyebrow">YOUR PERSPECTIVES</span><h2 id="history-title">나의 토론 기록</h2></div><button className="icon-button" onClick={() => historyRef.current?.close()} aria-label="기록 닫기"><X size={20}/></button></div><p className="dialog-description">이 브라우저에 최근 30개의 토론이 저장됩니다.</p><div className="history-items">{history.length ? history.map(debate => <button className="history-entry" key={debate.id} onClick={() => selectDebate(debate)}><span className="history-entry-icon"><MessageSquareText size={19}/></span><div><strong>{debate.topic}</strong><span>{new Date(debate.createdAt).toLocaleDateString("ko-KR")} · {debate.mode === "demo" ? "데모" : "실제 AI"} · {debate.messages.length}개의 발언</span></div><ChevronRight size={17}/></button>) : <div className="empty-history"><History size={32}/><h3>아직 토론 기록이 없어요.</h3><p>첫 토론을 시작하면 여기에 모아둘게요.</p></div>}</div>{!!history.length && <button className="clear-history" onClick={() => { localStorage.removeItem(historyStorageKey()); setHistory([]); notify("모든 토론 기록을 삭제했습니다."); }}><Trash2 size={14}/>모든 기록 삭제</button>}</dialog>
+    <dialog ref={historyRef} className="history-dialog" aria-labelledby="history-title"><div className="dialog-header"><div><span className="eyebrow">YOUR PERSPECTIVES</span><h2 id="history-title">나의 토론 기록</h2></div><button className="icon-button" onClick={() => historyRef.current?.close()} aria-label="기록 닫기"><X size={20}/></button></div><p className="dialog-description">이 브라우저에 최근 30개의 토론이 저장됩니다.</p><div className="history-items">{history.length ? history.map(debate => <button className="history-entry" key={debate.id} onClick={() => selectDebate(debate)}><span className="history-entry-icon"><MessageSquareText size={19}/></span><div><strong>{debate.topic}</strong><span>{new Date(debate.createdAt).toLocaleDateString("ko-KR")} · {debate.mode === "demo" ? "데모" : "실제 AI"} · {debate.messages.length}개의 발언</span></div><ChevronRight size={17}/></button>) : <div className="empty-history"><History size={32}/><h3>아직 토론 기록이 없어요.</h3><p>첫 토론을 시작하면 여기에 모아둘게요.</p></div>}</div>{!!history.length && <button className="clear-history" onClick={() => { localStorage.removeItem(HISTORY_KEY); setHistory([]); notify("모든 토론 기록을 삭제했습니다."); }}><Trash2 size={14}/>모든 기록 삭제</button>}</dialog>
     {toast && <div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>;
 }
