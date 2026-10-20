@@ -12,6 +12,9 @@
 # Local environment secrets
 .env*
 !.env.example
+# Legacy Firebase files may contain project-specific values; use environment variables instead.
+/src/lib/firebase-config.ts
+**/firebase-config.local.*
 
 # Local authentication data
 /.agora/
