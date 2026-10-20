@@ -208,7 +208,7 @@ export default function SettingsPage() {
     <Sidebar current="settings" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     <main className="main-shell">
       <header className="topbar settings-topbar">
-        <div className="settings-breadcrumb"><button type="button" className="icon-button mobile-menu" aria-label="메뉴 열기" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu size={20} /></button><span>워크스페이스</span><ChevronRight size={14} /><strong>설정</strong></div>
+        <div className="settings-breadcrumb"><button type="button" className="icon-button mobile-menu" aria-label="메뉴 열기" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu size={20} /></button><strong>설정</strong></div>
         <Link href="/" className="settings-back-link"><ArrowLeft size={15} />토론 스튜디오</Link>
       </header>
       <div className="page-inner settings-content">
