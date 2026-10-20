@@ -4,7 +4,6 @@ import { ProviderError } from "@/lib/server/providers";
 import { getPlanAccessToken } from "@/lib/server/chatgpt-auth";
 import { getRequestOrigin } from "@/lib/server/request-origin";
 import { requireLocalCliRequest } from "@/lib/server/antigravity";
-import { denyAnonymous } from "@/lib/server/site-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +12,6 @@ export const maxDuration = 90;
 const headers = { "Cache-Control": "no-store" };
 
 export async function POST(request: Request) {
-  const denied = await denyAnonymous(request); if (denied) return denied;
   try {
     const origin = request.headers.get("origin");
     if (origin && origin !== getRequestOrigin(request)) {
