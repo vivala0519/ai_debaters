@@ -19,10 +19,13 @@ export type SavedDebate = {
 
 export const SETTINGS_KEY = "agora-api-settings-v1";
 export const HISTORY_KEY = "agora-debates-v1";
+const scopedKey = (key: string) => `${key}:${typeof document !== "undefined" ? document.documentElement.dataset.userKey || "signed-out" : "signed-out"}`;
+export const settingsStorageKey = () => scopedKey(SETTINGS_KEY);
+export const historyStorageKey = () => scopedKey(HISTORY_KEY);
 
 export function readSettings(): ApiSettings | null {
   try {
-    const raw = sessionStorage.getItem(SETTINGS_KEY);
+    const raw = sessionStorage.getItem(settingsStorageKey());
     if (!raw) return null;
     const data = JSON.parse(raw);
     const ids: ProviderId[] = ["gpt", "claude", "gemini"];
@@ -35,7 +38,7 @@ export function readSettings(): ApiSettings | null {
 
 export function readHistory(): SavedDebate[] {
   try {
-    const data = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    const data = JSON.parse(localStorage.getItem(historyStorageKey()) || "[]");
     if (!Array.isArray(data)) return [];
     return data.filter(d => d && typeof d.id === "string" && typeof d.topic === "string" && typeof d.position === "string" && ["demo", "live"].includes(d.mode) && ["complete", "stopped", "error"].includes(d.status) && typeof d.createdAt === "string" && Number.isFinite(Date.parse(d.createdAt)) && Array.isArray(d.messages) && d.messages.every((m: DebateMessage) => m && typeof m.id === "string" && ["gpt", "claude", "gemini"].includes(m.providerId) && [1, 2, 3].includes(m.round) && typeof m.content === "string" && ["complete", "error"].includes(m.status) && (m.error === undefined || typeof m.error === "string"))).slice(0, 30);
   } catch { return []; }
@@ -43,7 +46,7 @@ export function readHistory(): SavedDebate[] {
 
 export function saveDebate(debate: SavedDebate): SavedDebate[] {
   const history = [debate, ...readHistory().filter(item => item.id !== debate.id)].slice(0, 30);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  localStorage.setItem(historyStorageKey(), JSON.stringify(history));
   return history;
 }
 

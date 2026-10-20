@@ -4,17 +4,20 @@ import { getConfiguration, InputError, readRequestJson, resolveSettings, validat
 import { getPlanAccessToken, getPlanStatus } from "@/lib/server/chatgpt-auth";
 import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getLocalGeminiStatus, requireLocalCliRequest } from "@/lib/server/antigravity";
+import { denyAnonymous } from "@/lib/server/site-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 240;
 
 export async function GET(request: Request) {
+  const denied = await denyAnonymous(request); if (denied) return denied;
   const [status, gemini] = await Promise.all([getPlanStatus(request).catch(() => null), new URL(request.url).searchParams.get("gemini") === "antigravity" ? getLocalGeminiStatus(request).catch(() => null) : Promise.resolve(null)]);
   return Response.json({ ...getConfiguration(), chatgptConnected: status?.connected ?? false, chatgptAccountId: status?.activeAccountId || null, geminiLocalReady: gemini?.ready ?? false }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
+  const denied = await denyAnonymous(request); if (denied) return denied;
   try {
     const origin = request.headers.get("origin");
     if (origin && origin !== getRequestOrigin(request)) {
