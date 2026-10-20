@@ -46,3 +46,6 @@
 .chatgpt-welcome p{font-size:12px;line-height:2;color:var(--muted);margin-bottom:18px}
 .chatgpt-welcome>.primary-button{display:flex;margin:22px 0 0 auto}
 @media(max-width:640px){.chatgpt-plan-panel{padding:14px}.chatgpt-plan-heading strong{font-size:11px}.chatgpt-plan-heading a{font-size:9px}.chatgpt-plan-actions{gap:11px}.chatgpt-plan-panel>p{font-size:9px}.chatgpt-auth-tabs button{font-size:9px}}
+
+/* Prevent iOS focus zoom by keeping mobile form controls at least 16px. */
+@media(max-width:850px){.settings-field>input,.settings-key-input input,.settings-model-select select,.chatgpt-account-label select{font-size:16px}}
