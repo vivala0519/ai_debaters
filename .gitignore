@@ -1,0 +1,25 @@
+# Dependencies
+/node_modules
+
+# Next.js build output
+/.next/
+/out/
+/build/
+
+# Vercel
+/.vercel
+
+# Local environment secrets
+.env*
+!.env.example
+
+# Local authentication data
+/.agora/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# IDE and OS files
+.idea/
+.DS_Store
+Thumbs.db
