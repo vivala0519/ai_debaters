@@ -13,9 +13,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function textField(value: unknown, label: string, max: number): string {
-  if (typeof value !== "string" || !value.trim() || value.trim().length > max) {
-    throw new InputError(`${label}은(는) 1~${max}자로 입력해 주세요.`);
+function textField(value: unknown, label: string, max: number, optional = false): string {
+  if (optional && value === undefined) return "";
+  if (typeof value !== "string" || (!optional && !value.trim()) || value.trim().length > max) {
+    throw new InputError(optional ? `${label}은(는) ${max}자 이내의 문자열로 입력해 주세요.` : `${label}은(는) 1~${max}자로 입력해 주세요.`);
   }
   return value.trim();
 }
@@ -49,7 +50,7 @@ export function validateDebateRequest(value: unknown): DebateRequest {
   if (value.gptAccountId !== undefined && (typeof value.gptAccountId !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(value.gptAccountId))) throw new InputError("ChatGPT 계정 선택을 확인해주세요.");
   return {
     topic: textField(value.topic, "토론 주제", 180),
-    position: textField(value.position, "나의 입론", 4000),
+    position: textField(value.position, "나의 입론", 4000, true),
     mode: value.mode,
     credentials: overrides(value.credentials, "credentials"),
     models: overrides(value.models, "models"),

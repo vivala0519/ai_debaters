@@ -13,9 +13,8 @@ export function Sidebar({ current = "studio", history: suppliedHistory, onNew, o
   useEffect(() => { if (!suppliedHistory) setLocalHistory(readHistory()); }, [suppliedHistory]);
   const history = suppliedHistory ?? localHistory;
   return <><div className={`sidebar-scrim ${open ? "visible" : ""}`} onClick={onClose}/><aside className={`sidebar ${open ? "is-open" : ""}`}>
-    <Link className="brand" href="/" aria-label="agora 홈"><BrandMark/><span>agora<span className="brand-dot">.</span></span><span className="brand-beta">BETA</span></Link>
+    <Link className="brand" href="/" aria-label="Prism 홈"><BrandMark/><span>prism<span className="brand-dot">.</span></span><span className="brand-beta">BETA</span></Link>
     <button className="mobile-close icon-button" aria-label="메뉴 닫기" onClick={onClose}><X size={19}/></button>
-    <div className="workspace-selector"><span className="workspace-avatar">A</span><div><strong>My workspace</strong><span>Personal workspace</span></div><ChevronDown size={15}/></div>
     {onNew ? <button className="new-debate" onClick={onNew}><Plus size={17}/>새 토론 시작<span>↗</span></button> : <Link className="new-debate" href="/"><Plus size={17}/>새 토론 시작<span>↗</span></Link>}
     <p className="nav-caption">WORKSPACE</p>
     <nav aria-label="주 메뉴"><Link href="/" className={`nav-item ${current === "studio" ? "active" : ""}`}><MessageSquare size={18}/>토론 스튜디오<span className="nav-active-dot"/></Link>

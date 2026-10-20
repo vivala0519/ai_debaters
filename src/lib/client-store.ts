@@ -49,5 +49,5 @@ export function saveDebate(debate: SavedDebate): SavedDebate[] {
 
 export function debateMarkdown(debate: SavedDebate) {
   const labels = ["독립 입론", "상호 반박", "최종 입장"];
-  return `# ${debate.topic}\n\n${debate.mode === "demo" ? "> 데모 토론: 실제 AI가 생성한 답변이 아닌 흐름 예시입니다.\n\n" : ""}나의 입론: ${debate.position}\n\n${labels.map((label, index) => `## ${index + 1}라운드 · ${label}\n\n${debate.messages.filter(m => m.round === index + 1).map(m => `### ${{ gpt: "GPT", claude: "Claude", gemini: "Gemini" }[m.providerId]}\n\n${m.content}${m.status === "error" ? `\n\n오류: ${m.error ?? "응답 실패"}` : ""}`).join("\n\n")}`).join("\n\n")}\n`;
+  return `# ${debate.topic}\n\n${debate.mode === "demo" ? "> 데모 토론: 실제 AI가 생성한 답변이 아닌 흐름 예시입니다.\n\n" : ""}${debate.position ? `나의 입론: ${debate.position}\n\n` : ""}${labels.map((label, index) => `## ${index + 1}라운드 · ${label}\n\n${debate.messages.filter(m => m.round === index + 1).map(m => `### ${{ gpt: "GPT", claude: "Claude", gemini: "Gemini" }[m.providerId]}\n\n${m.content}${m.status === "error" ? `\n\n오류: ${m.error ?? "응답 실패"}` : ""}`).join("\n\n")}`).join("\n\n")}\n`;
 }

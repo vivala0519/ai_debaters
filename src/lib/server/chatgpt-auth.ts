@@ -91,7 +91,7 @@ export async function startPlanLogin(request: Request, accountId?: string) {
     session.expiresAt = Date.now() + SESSION_SECONDS * 1000;
     const url = new URL(`${ISSUER}/api/accounts/authorize`);
     url.search = new URLSearchParams({ client_id: account?.clientId || "dynamic_agent_client", ext_agent_host_id: store.hostId, response_type: "code", redirect_uri: redirect.href, scope: SCOPES, resource: RESOURCE, state, nonce, code_challenge_method: "S256", code_challenge: createHash("sha256").update(verifier).digest("base64url") }).toString();
-    if (!account) url.searchParams.set("agent_name_hint", "agora AI Debate Studio");
+    if (!account) url.searchParams.set("agent_name_hint", "Prism AI Debate Studio");
     if (account?.idToken) url.searchParams.set("id_token_hint", account.idToken);
     if (account?.email) url.searchParams.set("login_hint", account.email);
     return { sessionId, url: url.href };

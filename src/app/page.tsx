@@ -5,7 +5,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, CheckCheck, ChevronRight, CircleHelp, Copy, FlaskConical, History, Layers3, Lightbulb, LoaderCircle, Menu, MessageSquare, MessageSquareText, RotateCcw, Settings2, Shuffle, Sparkles, Square, Trash2, X } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
-import { ProviderMark } from "@/components/brand";
+import { PrismSymbol, ProviderMark } from "@/components/brand";
 import { PROVIDERS, type DebateEvent, type DebateMessage, type DebateMode, type DebateRound, type ProviderId } from "@/lib/debate";
 import { HISTORY_KEY, debateMarkdown, readHistory, readSettings, saveDebate, type SavedDebate } from "@/lib/client-store";
 
@@ -98,7 +98,7 @@ export default function StudioPage() {
   async function startDebate(override?: typeof EXAMPLES[number]) {
     if (controllerRef.current) return;
     const inputTopic = (override?.topic ?? topic).trim(); const inputPosition = (override?.position ?? position).trim();
-    if (!inputTopic || !inputPosition) { setError("토론 주제와 나의 입론을 모두 입력해주세요."); return; }
+    if (!inputTopic) { setError("토론 주제를 입력해주세요."); return; }
     const selectedMode = override ? "demo" : mode;
     if (selectedMode === "live" && !liveReady) { setError("설정에서 GPT·Claude·Gemini 연결 설정을 마친 후 시작해주세요."); return; }
     if (override) { setTopic(inputTopic); setPosition(inputPosition); setMode("demo"); }
@@ -149,21 +149,21 @@ export default function StudioPage() {
   function exportDebate() {
     if (!result) return;
     const url = URL.createObjectURL(new Blob([debateMarkdown(result)], { type: "text/markdown;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = `agora-${result.topic.replace(/[<>:"/\\|?*]/g, "").slice(0, 55)}.md`; a.click(); URL.revokeObjectURL(url); notify("Markdown 파일을 내보냈습니다.");
+    const a = document.createElement("a"); a.href = url; a.download = `prism-${result.topic.replace(/[<>:"/\\|?*]/g, "").slice(0, 55)}.md`; a.click(); URL.revokeObjectURL(url); notify("Markdown 파일을 내보냈습니다.");
   }
   const hasResults = running || !!result;
 
   return <div className="app-shell">
     <Sidebar history={history} onNew={newDebate} onHistory={() => historyRef.current?.showModal()} onSelect={selectDebate} open={mobileMenu} onClose={() => setMobileMenu(false)}/>
     <main className="main-shell">
-      <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={() => setMobileMenu(true)} aria-label="메뉴 열기"><Menu size={20}/></button><MessageSquare size={16}/><span>워크스페이스</span><ChevronRight size={13}/><strong>토론 스튜디오</strong></div><div className="topbar-right"><Link className="icon-button" href="/settings" title="설정" aria-label="설정"><Settings2 size={18}/></Link></div></header>
+      <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={() => setMobileMenu(true)} aria-label="메뉴 열기"><Menu size={20}/></button><MessageSquare size={16}/><strong>토론 스튜디오</strong></div><div className="topbar-right"><Link className="icon-button" href="/settings" title="설정" aria-label="설정"><Settings2 size={18}/></Link></div></header>
       <div className="page-inner">
-        <section className="hero"><div><div className="eyebrow"><span/>A SPACE FOR BETTER THINKING</div><h1>하나의 질문, <span>세 개의 시선.</span></h1><p>서로 다른 AI의 생각이 만나, 당신의 관점이 더 깊어집니다.</p></div><div className="hero-symbol" aria-hidden="true"><span className="orbit-line one"/><span className="orbit-line two"/><span className="orbit-line three"/><span className="orbit-node n1"/><span className="orbit-node n2"/><span className="orbit-node n3"/><Sparkles size={24}/></div></section>
+        <section className="hero"><div><div className="eyebrow"><span/>A SPACE FOR BETTER THINKING</div><h1>AI의 <span>시선</span></h1><p>서로 다른 AI의 생각이 만나, 당신의 관점이 더 깊어집니다.</p></div><div className="hero-symbol" aria-hidden="true"><PrismSymbol className="hero-prism"/></div></section>
         <div className="setup-grid">
           <form className="composer-card" onSubmit={e => { e.preventDefault(); void startDebate(); }}>
-            <div className="card-heading"><span className="heading-icon"><MessageSquareText size={18}/></span><div><h2>어떤 생각을 나눠볼까요?</h2><p>궁금한 주제와 당신의 생각을 들려주세요.</p></div><span className="input-step">01 / START</span></div>
-            <div className="topic-field"><label htmlFor="topic">토론 주제 <span>*</span></label><input id="topic" placeholder="예: AI는 인간의 창의성을 대체할 수 있을까?" value={topic} onChange={e => setTopic(e.target.value)} maxLength={180} disabled={running} required autoComplete="off"/></div>
-            <div className="position-field"><div className="field-label-row"><label htmlFor="position">나의 입론 <span>*</span></label><span>자유롭게 생각을 적어주세요</span></div><textarea id="position" placeholder={"이 주제에 대해 어떻게 생각하시나요?\n당신의 입장과 이유를 적으면 더 풍부한 토론이 시작됩니다."} value={position} onChange={e => setPosition(e.target.value)} maxLength={4000} disabled={running} required/><span className="char-count">{position.length.toLocaleString()} / 4,000</span></div>
+            <div className="card-heading"><span className="heading-icon"><MessageSquareText size={18}/></span><span className="input-step">01 / START</span></div>
+            <div className="topic-field"><label htmlFor="topic">토론 주제 <span>*</span></label><input id="topic" placeholder="" value={topic} onChange={e => setTopic(e.target.value)} maxLength={180} disabled={running} required autoComplete="off"/></div>
+            <div className="position-field"><div className="field-label-row"><label htmlFor="position">나의 입론 (선택)</label></div><textarea id="position" placeholder="" value={position} onChange={e => setPosition(e.target.value)} maxLength={4000} disabled={running}/><span className="char-count">{position.length.toLocaleString()} / 4,000</span></div>
             <div className="composer-footer">{running ? <button className="stop-button" type="button" onClick={() => controllerRef.current?.abort()}><Square size={13}/>토론 중지</button> : <button className="primary-button" type="submit">토론 시작하기<ArrowUpRight size={17}/></button>}</div>
           </form>
           <aside className="participants-card"><div className="panel-heading"><h2>토론 패널</h2><span>3 PARTICIPANTS</span></div><div className="provider-list">{PROVIDERS.map(provider => <div className="provider-row" key={provider.id}><ProviderMark id={provider.id}/><div className="provider-info"><strong>{provider.name}<span>{provider.company}</span></strong><p>{{ gpt: "논리적 분석과 균형 잡힌 시각", claude: "깊이 있는 사고와 섬세한 해석", gemini: "다각적 탐색과 새로운 연결" }[provider.id]}</p></div><span className="participant-status" title={mode === "demo" ? "데모 패널" : availableProviders.includes(provider.id) ? "연결 설정됨" : "연결 설정 필요"}><span/></span></div>)}</div><div className="panel-note"><span className="note-stars"><Sparkles size={17}/></span></div></aside>
@@ -234,7 +234,7 @@ export default function StudioPage() {
             </div>}</> : <>
           </>}
         </section>
-        <footer className="page-footer"><span>서로 다른 생각이 만나는 곳, <strong>agora.</strong></span><span>Powered by curiosity<span className="footer-star">✳</span></span></footer>
+        <footer className="page-footer"><span>서로 다른 생각이 만나는 곳, <strong>prism.</strong></span><span>Powered by curiosity<span className="footer-star">✳</span></span></footer>
       </div>
     </main>
     <dialog ref={historyRef} className="history-dialog" aria-labelledby="history-title"><div className="dialog-header"><div><span className="eyebrow">YOUR PERSPECTIVES</span><h2 id="history-title">나의 토론 기록</h2></div><button className="icon-button" onClick={() => historyRef.current?.close()} aria-label="기록 닫기"><X size={20}/></button></div><p className="dialog-description">이 브라우저에 최근 30개의 토론이 저장됩니다.</p><div className="history-items">{history.length ? history.map(debate => <button className="history-entry" key={debate.id} onClick={() => selectDebate(debate)}><span className="history-entry-icon"><MessageSquareText size={19}/></span><div><strong>{debate.topic}</strong><span>{new Date(debate.createdAt).toLocaleDateString("ko-KR")} · {debate.mode === "demo" ? "데모" : "실제 AI"} · {debate.messages.length}개의 발언</span></div><ChevronRight size={17}/></button>) : <div className="empty-history"><History size={32}/><h3>아직 토론 기록이 없어요.</h3><p>첫 토론을 시작하면 여기에 모아둘게요.</p></div>}</div>{!!history.length && <button className="clear-history" onClick={() => { localStorage.removeItem(HISTORY_KEY); setHistory([]); notify("모든 토론 기록을 삭제했습니다."); }}><Trash2 size={14}/>모든 기록 삭제</button>}</dialog>
