@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle, ArrowLeft, ArrowUpRight, Check, CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, KeyRound, LoaderCircle, LockKeyhole, Menu, PlugZap, RotateCcw, Save, ShieldCheck, X } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { ProviderMark } from "@/components/brand";
-import { readSettings, SETTINGS_KEY, type ApiSettings } from "@/lib/client-store";
+import { readSettings, settingsStorageKey, type ApiSettings } from "@/lib/client-store";
 import { PROVIDERS, type ProviderId } from "@/lib/debate";
 import { getModelOptions } from "@/lib/model-options";
 import type { ConnectionTestRequest, ConnectionTestResponse } from "@/lib/connection-test";
@@ -93,7 +93,7 @@ export default function SettingsPage() {
     // overwriting other, unsaved form edits.
     const saved = readSettings();
     if (saved?.gptAuthMode === "chatgpt") {
-      try { sessionStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...saved, models: { ...saved.models, gpt: model } })); }
+      try { sessionStorage.setItem(settingsStorageKey(), JSON.stringify({ ...saved, models: { ...saved.models, gpt: model } })); }
       catch { /* The normal save button reports storage failures. */ }
     }
     setDirty(true); setStatus(null);
@@ -176,7 +176,7 @@ export default function SettingsPage() {
       normalized.models[provider.id] = settings.models[provider.id].trim() || provider.model;
     }
     try {
-      sessionStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized));
+      sessionStorage.setItem(settingsStorageKey(), JSON.stringify(normalized));
       setSettings(normalized);
       setDirty(false);
       setStatus({ text: "현재 브라우저 세션에 설정을 저장했습니다." });
@@ -189,7 +189,7 @@ export default function SettingsPage() {
 
   function reset() {
     try {
-      sessionStorage.removeItem(SETTINGS_KEY);
+      sessionStorage.removeItem(settingsStorageKey());
       for (const controller of Object.values(testControllers.current)) controller?.abort();
       testControllers.current = {};
       setTests(initialTests());
@@ -206,9 +206,9 @@ export default function SettingsPage() {
 
   return <div className="app-shell settings-shell">
     <Sidebar current="settings" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-    <main className="main-shell">
+    <main className="main-shell" inert={sidebarOpen || undefined}>
       <header className="topbar settings-topbar">
-        <div className="settings-breadcrumb"><button type="button" className="icon-button mobile-menu" aria-label="메뉴 열기" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu size={20} /></button><strong>설정</strong></div>
+        <div className="settings-breadcrumb"><button type="button" className="icon-button mobile-menu" aria-label="메뉴 열기" aria-expanded={sidebarOpen} aria-controls="main-sidebar" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button><strong>설정</strong></div>
         <Link href="/" className="settings-back-link"><ArrowLeft size={15} />토론 스튜디오</Link>
       </header>
       <div className="page-inner settings-content">

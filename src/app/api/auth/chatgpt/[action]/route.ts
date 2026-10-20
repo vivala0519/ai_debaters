@@ -2,6 +2,7 @@ import { finishPlanLogin, getPlanStatus, handlePlanCallback, listPlanModels, req
 import { InputError, readRequestJson } from "@/lib/server/input";
 import { sessionCookie } from "@/lib/server/chatgpt-store";
 import { getRequestOrigin } from "@/lib/server/request-origin";
+import { denyAnonymous } from "@/lib/server/site-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ const redirect = (url: string) => new Response(null, { status: 303, headers: { .
 export async function GET(request: Request, context: Context) {
   try {
     const { action } = await context.params;
+    if (action !== "callback") { const denied = await denyAnonymous(request); if (denied) return denied; }
     if (action === "status") return Response.json(await getPlanStatus(request), { headers });
     requireLocalPlan(request);
     if (action === "models") return Response.json({ models: await listPlanModels(request) }, { headers });
@@ -24,6 +26,7 @@ export async function GET(request: Request, context: Context) {
 }
 
 export async function POST(request: Request, context: Context) {
+  const denied = await denyAnonymous(request); if (denied) return denied;
   try {
     const { action } = await context.params;
     const body = await readRequestJson(request) as { accountId?: unknown };
