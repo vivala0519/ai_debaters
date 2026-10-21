@@ -220,7 +220,7 @@ export default function SettingsPage() {
           <span className="settings-count"><span />{enteredCount} / 3 설정됨</span>
         </div>
 
-        <p className="settings-test-notice"><PlugZap size={14} /><span>저장 전에도 연결을 테스트할 수 있습니다. API 키 방식은 API 사용량, 구독 연결은 해당 서비스의 플랜 사용량이 발생합니다.</span></p>
+        <p className="settings-test-notice"><PlugZap size={14} /><span>저장 전에도 연결을 테스트할 수 있습니다. 연결 테스트에는 각 연결 방식에 따른 사용량이 발생합니다.</span></p>
 
         <form onSubmit={save} className="settings-form" aria-label="AI API 설정">
           <div className="settings-provider-list">
@@ -257,7 +257,7 @@ export default function SettingsPage() {
               </div>
               <div className="settings-connection-test">
                 <div className={`settings-test-result ${test.status}`} role="status" aria-live="polite" aria-atomic="true">
-                  {test.status === "idle" && <><PlugZap size={15} /><span>{useLocal ? "CLI에 로그인한 Google 계정의 Antigravity 사용량으로 테스트합니다." : usePlan ? "연결한 ChatGPT 계정과 선택한 모델로 테스트합니다." : "현재 입력한 키와 모델로 테스트합니다."}</span></>}
+                  {test.status === "idle" && <><PlugZap size={15} /><span>{useLocal ? "이 PC의 CLI 연결 상태를 테스트합니다." : usePlan ? "연결한 ChatGPT 계정과 선택한 모델로 테스트합니다." : "현재 입력한 키와 모델로 테스트합니다."}</span></>}
                   {test.status === "testing" && <><LoaderCircle size={15} className="spin" /><span>모델의 응답을 기다리고 있습니다.</span></>}
                   {test.status === "success" && <><CheckCircle2 size={16} /><div><strong>모델 응답을 확인했습니다.</strong><span>{test.model} · {(test.latencyMs / 1000).toFixed(2)}초</span></div></>}
                   {test.status === "error" && <><AlertCircle size={16} /><span>{test.message}</span></>}
@@ -279,7 +279,7 @@ export default function SettingsPage() {
           <div className="settings-actions"><button className="button secondary-button settings-reset" type="button" onClick={reset} disabled={!ready}><RotateCcw size={15} />설정 초기화</button><div className="settings-save-group"><span className="settings-unsaved">{dirty ? "저장하지 않은 변경사항이 있습니다." : ""}</span><button className="button primary-button" type="submit" disabled={!ready}><Save size={16} />설정 저장하기</button></div></div>
           <div className={`settings-status ${status?.error ? "is-error" : ""}`} role="status" aria-live="polite">{status && <>{status.error ? <LockKeyhole size={15} /> : <Check size={15} />}{status.text}</>}</div>
         </form>
-        <p className="settings-footnote">API 키 방식은 각 서비스 API 요금이, 구독 연결은 ChatGPT 또는 Antigravity 플랜 사용량이 적용됩니다. <Link href="/">키 없이 데모 체험하기<ArrowUpRight size={12} /></Link></p>
+        <p className="settings-footnote">API 키 연결은 각 서비스의 API 요금이 적용됩니다. ChatGPT 플랜 연결은 로컬 실행에서 사용할 수 있습니다. Antigravity CLI의 외부 앱 연동은 소비자 플랜에서 지원되지 않습니다. <Link href="/">키 없이 데모 체험하기<ArrowUpRight size={12} /></Link></p>
       </div>
     </main>
   </div>;

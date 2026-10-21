@@ -1,0 +1,8 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "debates", "fieldPath": "messages", "indexes": [] },
+    { "collectionGroup": "debates", "fieldPath": "position", "indexes": [] },
+    { "collectionGroup": "debates", "fieldPath": "topic", "indexes": [] }
+  ]
+}

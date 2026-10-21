@@ -329,3 +329,10 @@
   from { opacity: 0; transform: translate(-50%, 8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+/* History synchronization status stays readable inside the mobile dialog. */
+.history-sync-status{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;color:var(--text);font-size:12px;line-height:1.7;border-bottom:1px solid var(--border)}
+.history-sync-status>span{min-width:0;overflow-wrap:anywhere}
+.history-sync-status .text-button{flex-shrink:0;white-space:nowrap}
+.history-sync-status.is-error{color:#b33f4b}
+.clear-history:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:640px){.history-sync-status{align-items:flex-start;font-size:12px;gap:8px}.history-sync-status .text-button{font-size:12px}}

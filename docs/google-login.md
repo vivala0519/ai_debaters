@@ -16,7 +16,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
 ```
 
-`API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `APP_ID`가 필수입니다. 나머지는 웹 앱 설정에 맞추되 Analytics와 Firestore는 초기화하지 않습니다. 값이 없으면 로그인 버튼을 활성화하지 않고, 서버도 설정되지 않은 프로젝트의 토큰을 수락하지 않습니다.
+`API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `APP_ID`가 필수입니다. 나머지는 웹 앱 설정에 맞추되 브라우저의 Analytics와 Firestore는 초기화하지 않습니다. 값이 없으면 로그인 버튼을 활성화하지 않고, 서버도 설정되지 않은 프로젝트의 토큰을 수락하지 않습니다. 기기 간 토론 기록 동기화에는 별도의 서버 설정이 필요합니다. [기록 동기화 안내](./history-sync.md)를 참고하세요.
 
 Firebase Authentication에서 Google 제공자를 켜고 지원 이메일을 저장합니다. 승인된 도메인에는 `localhost`와 실제 사용하는 배포 도메인을 등록합니다. `127.0.0.1`로 접속한다면 그것도 별도로 등록합니다. 도메인은 `https://`, 경로, 포트 없이 입력합니다.
 
@@ -27,7 +27,7 @@ Firebase Authentication에서 Google 제공자를 켜고 지원 이메일을 저
 3. 변경된 코드를 배포합니다. `NEXT_PUBLIC_` 변수는 빌드 시 반영되므로 변수만 바꾸었다면 재배포해야 합니다.
 4. `/login`에서 Google 계정으로 로그인해 처음 요청했던 화면으로 돌아오는지 확인합니다. 모바일에서는 배포된 HTTPS 주소를 사용합니다.
 
-Google OAuth 클라이언트 시크릿이나 서비스 계정 JSON은 필요하지 않습니다. 일반 Vercel 배포에서는 `AUTH_URL`을 비워 둡니다. 별도 프록시를 사용하는 경우 정확한 HTTPS 사이트 주소를 지정할 수 있습니다.
+로그인만 사용할 때는 Google OAuth 클라이언트 시크릿이나 서비스 계정 JSON이 필요하지 않습니다. 기록 동기화에는 [서버용 Firebase 설정](./history-sync.md)이 추가로 필요합니다. 일반 Vercel 배포에서는 `AUTH_URL`을 비워 둡니다. 별도 프록시를 사용하는 경우 정확한 HTTPS 사이트 주소를 지정할 수 있습니다.
 
 ## GitHub 경고와 이전 커밋
 
@@ -39,10 +39,12 @@ Firebase 웹 설정은 브라우저에 전달되는 공개 식별 정보입니�
 
 서버는 Firebase 토큰의 서명, 프로젝트 발급자·대상, 만료와 인증 시각, 이메일 인증, Google 로그인 제공자를 검증합니다. 비밀번호·익명·다른 제공자로 로그인한 토큰은 거부합니다. 검증된 토큰은 HttpOnly·SameSite=Lax 쿠키에 보관하며 HTTPS에서는 Secure·`__Host-` 접두사를 적용합니다. 쿠키는 토큰 만료까지 최대 1시간이고 Firebase SDK가 토큰과 쿠키를 갱신합니다. 관리 화면에서 사용자를 중지해도 이미 발급한 토큰은 만료까지 유효할 수 있습니다.
 
-설정과 기록은 브라우저에서 Google 계정별로 분리됩니다. 기기 간 기록 동기화는 추가하지 않았습니다. 로그아웃하면 Firebase 로그인 상태와 사이트·ChatGPT 연결 쿠키를 지웁니다.
+서버용 Firebase 설정을 완료하면 토론 기록을 검증된 Firebase UID별로 Firestore에 저장합니다. PC와 모바일에서 같은 Google 계정으로 로그인하면 최근 30개 기록을 함께 볼 수 있습니다. 기존 브라우저 기록도 동기화하며, 연결이 끊기면 로컬 기록을 유지하고 나중에 다시 동기화합니다. 기록 전체 삭제도 다른 기기에 반영됩니다. 자세한 동작과 설정은 [기록 동기화 안내](./history-sync.md)를 참고하세요.
+
+API 키, 모델 선택과 AI 연결 설정은 브라우저 세션에만 저장합니다. ChatGPT 플랜 연결은 로컬 PC에서만 사용할 수 있으며 기록 동기화와 별개입니다. 로그아웃하면 Firebase 로그인 상태와 사이트·로컬 ChatGPT 연결 쿠키를 지웁니다.
 
 ## 개발 검증
 
-`npm test`는 실제 키 없이 가상의 프로젝트와 로컬 RSA 키로 서버 인증을 검사합니다. `npm run build`로 빌드를 검사합니다. 로컬 서버에 `AGORA_BASE_URL`을 지정하고 `node scripts/auth-smoke.mjs`를 실행하면 잘못된 토큰, CSRF, 비로그인 접근 제한과 PWA를 검사합니다. 실제 로그인 후 토론 검증은 실제 세션이 필요합니다. 세션 쿠키는 Git이나 채팅에 공유하지 마세요.
+`npm test`는 실제 클라우드 키 없이 기록 병합, 계정 분리, 동시 저장, 삭제 전파와 API 접근 제한을 검사합니다. `npm run build`로 빌드를 검사합니다. `npm run test:http`는 임시 서버에서 잘못된 토큰, CSRF, 비로그인 접근 제한과 PWA를 검사한 뒤 서버를 종료합니다. 실제 로그인 후 토론·기록 동기화 검증은 실제 세션이 필요합니다. 세션 쿠키는 Git이나 채팅에 공유하지 마세요.
 
 공식 문서: [Firebase API 키 관리](https://firebase.google.com/docs/projects/api-keys), [Google 로그인](https://firebase.google.com/docs/auth/web/google-signin), [GitHub의 기록 정리 안내](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).

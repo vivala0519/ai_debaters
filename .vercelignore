@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+.agora
+**/.agora/**
+.env*
+**/.env*
+!.env.example
+.vercel
+.idea
+*.tsbuildinfo
+**/*service-account*.json
+**/*credentials*.json

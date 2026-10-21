@@ -1,20 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ArrowUpRight, Check, ChevronDown, CircleHelp, History, MessageSquare, Plus, Settings2, X } from "lucide-react";
 import { BrandMark, ProviderMark } from "./brand";
-import { readHistory, type SavedDebate } from "@/lib/client-store";
+import type { SavedDebate } from "@/lib/client-store";
+import { useDebateHistory } from "@/lib/use-debate-history";
 import { UserMenu } from "./user-menu";
 
 type Props = { current?: "studio" | "settings"; history?: SavedDebate[]; onNew?: () => void; onHistory?: () => void; onSelect?: (debate: SavedDebate) => void; open?: boolean; onClose?: () => void };
 
 export function Sidebar({ current = "studio", history: suppliedHistory, onNew, onHistory, onSelect, open, onClose }: Props) {
-  const [localHistory, setLocalHistory] = useState<SavedDebate[]>([]);
+  const syncedHistory = useDebateHistory(suppliedHistory === undefined);
   const drawerRef = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
-  useEffect(() => { if (!suppliedHistory) setLocalHistory(readHistory()); }, [suppliedHistory]);
   useEffect(() => {
     if (!open) return;
     const mobile = window.matchMedia("(max-width: 850px)");
@@ -51,7 +51,7 @@ export function Sidebar({ current = "studio", history: suppliedHistory, onNew, o
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [open]);
-  const history = suppliedHistory ?? localHistory;
+  const history = suppliedHistory ?? syncedHistory.history;
   return <><div className={`sidebar-scrim ${open ? "visible" : ""}`} onClick={onClose} aria-hidden="true"/><aside id="main-sidebar" ref={drawerRef} className={`sidebar ${open ? "is-open" : ""}`} role={open ? "dialog" : undefined} aria-modal={open || undefined} aria-label="주 메뉴" tabIndex={open ? -1 : undefined}>
     <Link className="brand" href="/" aria-label="Prism 홈"><BrandMark/><span>prism<span className="brand-dot">.</span></span><span className="brand-beta">BETA</span></Link>
     <button className="mobile-close icon-button" aria-label="메뉴 닫기" onClick={onClose}><X size={19}/></button>

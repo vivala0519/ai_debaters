@@ -1,20 +1,13 @@
-import type { DebateMessage, DebateMode, ProviderId } from "./debate";
+import type { DebateMessage, ProviderId } from "./debate";
+import type { SavedDebate } from "./history";
+import type { HistorySyncMetadata } from "./history-sync";
+export type { SavedDebate } from "./history";
 
 export type ApiSettings = {
   credentials: Record<ProviderId, string>;
   models: Record<ProviderId, string>;
   gptAuthMode?: "api-key" | "chatgpt";
   geminiAuthMode?: "api-key" | "antigravity";
-};
-
-export type SavedDebate = {
-  id: string;
-  topic: string;
-  position: string;
-  mode: DebateMode;
-  createdAt: string;
-  messages: DebateMessage[];
-  status: "complete" | "stopped" | "error";
 };
 
 export const SETTINGS_KEY = "agora-api-settings-v1";
@@ -38,16 +31,34 @@ export function readSettings(): ApiSettings | null {
 
 export function readHistory(): SavedDebate[] {
   try {
-    const data = JSON.parse(localStorage.getItem(historyStorageKey()) || "[]");
+    const stored = JSON.parse(localStorage.getItem(historyStorageKey()) || "[]");
+    const data = stored?.version === 2 ? stored.history : stored;
     if (!Array.isArray(data)) return [];
     return data.filter(d => d && typeof d.id === "string" && typeof d.topic === "string" && typeof d.position === "string" && ["demo", "live"].includes(d.mode) && ["complete", "stopped", "error"].includes(d.status) && typeof d.createdAt === "string" && Number.isFinite(Date.parse(d.createdAt)) && Array.isArray(d.messages) && d.messages.every((m: DebateMessage) => m && typeof m.id === "string" && ["gpt", "claude", "gemini"].includes(m.providerId) && [1, 2, 3].includes(m.round) && typeof m.content === "string" && ["complete", "error"].includes(m.status) && (m.error === undefined || typeof m.error === "string"))).slice(0, 30);
   } catch { return []; }
 }
 
+export function readHistoryMetadata(): HistorySyncMetadata {
+  try {
+    const data = JSON.parse(localStorage.getItem(historyStorageKey()) || "[]");
+    if (data?.version !== 2 || !(data.generation === null || Number.isSafeInteger(data.generation) && data.generation >= 0)
+      || !Array.isArray(data.knownIds) || data.knownIds.length > 30 || !data.knownIds.every((id: unknown) => typeof id === "string")) return { generation: null, knownIds: [] };
+    return { generation: data.generation, knownIds: [...new Set<string>(data.knownIds)] };
+  } catch { return { generation: null, knownIds: [] }; }
+}
+
 export function saveDebate(debate: SavedDebate): SavedDebate[] {
   const history = [debate, ...readHistory().filter(item => item.id !== debate.id)].slice(0, 30);
-  localStorage.setItem(historyStorageKey(), JSON.stringify(history));
+  writeHistory(history);
   return history;
+}
+
+export function writeHistory(history: SavedDebate[], metadata = readHistoryMetadata()): void {
+  const ids = new Set(history.map(debate => debate.id));
+  // Records and their server acknowledgements share one atomic storage write.
+  // A reload can never retain an old record while losing its clear generation.
+  localStorage.setItem(historyStorageKey(), JSON.stringify({ version: 2, history, generation: metadata.generation,
+    knownIds: [...new Set(metadata.knownIds)].filter(id => ids.has(id)).slice(0, 30) }));
 }
 
 export function debateMarkdown(debate: SavedDebate) {
