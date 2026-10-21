@@ -41,10 +41,10 @@ Firebase 웹 설정은 브라우저에 전달되는 공개 식별 정보입니�
 
 서버용 Firebase 설정을 완료하면 토론 기록을 검증된 Firebase UID별로 Firestore에 저장합니다. PC와 모바일에서 같은 Google 계정으로 로그인하면 최근 30개 기록을 함께 볼 수 있습니다. 기존 브라우저 기록도 동기화하며, 연결이 끊기면 로컬 기록을 유지하고 나중에 다시 동기화합니다. 기록 전체 삭제도 다른 기기에 반영됩니다. 자세한 동작과 설정은 [기록 동기화 안내](./history-sync.md)를 참고하세요.
 
-API 키, 모델 선택과 AI 연결 설정은 브라우저 세션에만 저장합니다. ChatGPT 플랜 연결은 로컬 PC에서만 사용할 수 있으며 기록 동기화와 별개입니다. 로그아웃하면 Firebase 로그인 상태와 사이트·로컬 ChatGPT 연결 쿠키를 지웁니다.
+API 키 동기화를 설정하면 API 키를 계정별로 암호화해 서버에 저장하고, 같은 Google 계정으로 로그인한 PC·모바일에서 사용할 수 있습니다. [API 키 동기화 안내](./api-key-sync.md)를 참고하세요. 모델 선택과 연결 방식은 브라우저 세션에 저장합니다. ChatGPT 플랜 연결은 로컬 PC에서만 사용할 수 있으며 API 키 동기화와 별개입니다. 로그아웃하면 Firebase 로그인 상태와 사이트·로컬 ChatGPT 연결 쿠키를 지웁니다.
 
 ## 개발 검증
 
-`npm test`는 실제 클라우드 키 없이 기록 병합, 계정 분리, 동시 저장, 삭제 전파와 API 접근 제한을 검사합니다. `npm run build`로 빌드를 검사합니다. `npm run test:http`는 임시 서버에서 잘못된 토큰, CSRF, 비로그인 접근 제한과 PWA를 검사한 뒤 서버를 종료합니다. 실제 로그인 후 토론·기록 동기화 검증은 실제 세션이 필요합니다. 세션 쿠키는 Git이나 채팅에 공유하지 마세요.
+`npm test`는 실제 클라우드 키 없이 API 키 암호화, 계정 분리, 동시 저장, 삭제와 API 접근 제한을 검사합니다. `npm run build`로 빌드를 검사합니다. 빌드 후 `npm run test:http`는 임시 서버에서 잘못된 토큰, CSRF, 비로그인 접근 제한과 PWA를 검사한 뒤 서버를 종료합니다. 실제 로그인 후 토론·기기 간 동기화 검증은 실제 세션이 필요합니다. 세션 쿠키는 Git이나 채팅에 공유하지 마세요.
 
 공식 문서: [Firebase API 키 관리](https://firebase.google.com/docs/projects/api-keys), [Google 로그인](https://firebase.google.com/docs/auth/web/google-signin), [GitHub의 기록 정리 안내](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).

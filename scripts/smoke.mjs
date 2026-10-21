@@ -3,19 +3,27 @@ import assert from "node:assert/strict";
 // Run against an already running Next.js server. No real AI APIs are called.
 const base = process.env.AGORA_BASE_URL || "http://localhost:3000";
 const sessionCookie = process.env.AGORA_SESSION_COOKIE;
-const authenticatedFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...options.headers, ...(sessionCookie ? { Cookie: sessionCookie } : {}) } });
+let sessionOwner;
+const authenticatedFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...options.headers, ...(sessionCookie ? { Cookie: sessionCookie } : {}), ...(sessionOwner ? { "X-Prism-Api-Key-Owner": sessionOwner } : {}) } });
+if (sessionCookie) {
+  const session = await authenticatedFetch(new URL("/api/auth/session", base));
+  assert.equal(session.status, 200, "Provided Firebase session must be current");
+  sessionOwner = (await session.json()).user?.id;
+  assert.ok(sessionOwner);
+}
 for (const route of ["/", "/settings", "/guide"]) {
   const anonymous = await fetch(new URL(route, base), { redirect: "manual" });
   assert.equal(anonymous.status, 303, `${route} requires Google login`);
   assert.equal(new URL(anonymous.headers.get("location"), base).pathname, "/login");
 }
-for (const route of ["/api/debate", "/api/history", "/api/gemini-local", "/api/auth/chatgpt/status"]) {
+for (const route of ["/api/debate", "/api/api-keys", "/api/history", "/api/gemini-local", "/api/auth/chatgpt/status"]) {
   assert.equal((await fetch(new URL(route, base))).status, 401, `${route} requires a session`);
 }
 const anonymousPost = await fetch(new URL("/api/debate", base), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: "차단 확인", mode: "demo" }) });
 assert.equal(anonymousPost.status, 401);
 const forged = await fetch(new URL("/api/debate", base), { headers: { Cookie: "prism-firebase-session=forged" } });
 assert.equal(forged.status, 401);
+assert.equal((await fetch(new URL("/api/api-keys", base), { method: "PUT", headers: { "Content-Type": "application/json" }, body: '{"credentials":{"gpt":"test-key"}}' })).status, 401);
 for (const method of ["POST", "DELETE"]) {
   const historyRequest = await fetch(new URL("/api/history", base), { method, headers: { "Content-Type": "application/json" }, body: "{}" });
   assert.equal(historyRequest.status, 401, `history ${method} requires a session`);

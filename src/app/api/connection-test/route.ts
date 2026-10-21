@@ -4,22 +4,38 @@ import { ProviderError } from "@/lib/server/providers";
 import { getPlanAccessToken } from "@/lib/server/chatgpt-auth";
 import { getRequestOrigin } from "@/lib/server/request-origin";
 import { requireLocalCliRequest } from "@/lib/server/antigravity";
-import { denyAnonymous } from "@/lib/server/site-auth";
+import { requestSiteUser } from "@/lib/server/site-auth";
+import { ApiKeyStoreError, readSavedApiKeys } from "@/lib/server/api-key-store";
+import { PROVIDERS } from "@/lib/debate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 90;
 
-const headers = { "Cache-Control": "no-store" };
+const headers = { "Cache-Control": "private, no-store", Vary: "Cookie", "X-Content-Type-Options": "nosniff" };
 
 export async function POST(request: Request) {
-  const denied = await denyAnonymous(request); if (denied) return denied;
+  const user = await requestSiteUser(request);
+  if (!user) return Response.json({ error: "Google 계정으로 로그인해주세요.", code: "UNAUTHENTICATED" }, { status: 401, headers });
+  if (request.headers.get("x-prism-api-key-owner") !== user.id) return Response.json({ error: "로그인 계정이 변경되었습니다. 페이지를 새로고침해주세요.", code: "ACCOUNT_CHANGED" }, { status: 409, headers });
   try {
     const origin = request.headers.get("origin");
     if (origin && origin !== getRequestOrigin(request)) {
       throw new InputError("이 사이트의 설정에서 연결을 테스트해 주세요.", 403);
     }
-    const input = validateConnectionTestRequest(await readRequestJson(request));
+    const fields = await readRequestJson(request);
+    if (fields && typeof fields === "object" && !Array.isArray(fields)) {
+      const candidate = fields as Record<string, unknown>;
+      const provider = PROVIDERS.find(provider => provider.id === candidate.providerId);
+      const usePlan = provider?.id === "gpt" && candidate.gptAuthMode === "chatgpt";
+      const useLocal = provider?.id === "gemini" && candidate.geminiAuthMode === "antigravity";
+      // Entered keys may be tested before saving. Blank fields use the saved key.
+      if (provider && !usePlan && !useLocal && (candidate.apiKey === undefined || (typeof candidate.apiKey === "string" && !candidate.apiKey.trim()))) {
+        const savedKeys = await readSavedApiKeys(user.id);
+        candidate.apiKey = savedKeys?.[provider.id] || "";
+      }
+    }
+    const input = validateConnectionTestRequest(fields);
     if (input.providerId === "gpt" && input.gptAuthMode === "chatgpt") input.apiKey = await getPlanAccessToken(request, input.gptAccountId);
     if (input.providerId === "gemini" && input.geminiAuthMode === "antigravity") requireLocalCliRequest(request);
     const result = await testProviderConnection(input, request.signal);
@@ -28,7 +44,7 @@ export async function POST(request: Request) {
     if (request.signal.aborted) {
       return Response.json({ ok: false, error: "연결 테스트가 취소되었습니다." }, { status: 499, headers });
     }
-    const known = error instanceof InputError || error instanceof ProviderError;
+    const known = error instanceof InputError || error instanceof ProviderError || error instanceof ApiKeyStoreError;
     return Response.json(
       { ok: false, error: known ? error.message : "연결 테스트를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요." },
       { status: known ? error.status : 502, headers },

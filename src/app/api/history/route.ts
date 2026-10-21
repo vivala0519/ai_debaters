@@ -1,6 +1,7 @@
-import { HISTORY_REQUEST_BYTES, HistoryInputError } from "@/lib/history";
+import { HISTORY_REQUEST_BYTES, HistoryInputError, parseHistoryClear, parseHistoryUpload } from "@/lib/history";
 import { appendHistory, clearHistory, getHistory, HistoryConflictError } from "@/lib/server/history-store";
 import { requestSiteUser, siteOrigin } from "@/lib/server/site-auth";
+import { HistoryRelayError, relayHistoryRequest } from "@/lib/server/history-relay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ const unauthenticated = () => Response.json({ error: "Google 계정으로 로그
 const accountChanged = () => Response.json({ error: "로그인 계정이 변경되었습니다. 페이지를 새로고침해주세요.", code: "ACCOUNT_CHANGED" }, { status: 409, headers });
 
 function failure(error: unknown) {
-  return error instanceof HistoryInputError || error instanceof HistoryConflictError
+  return error instanceof HistoryInputError || error instanceof HistoryConflictError || error instanceof HistoryRelayError
     ? Response.json({ error: error.message }, { status: error.status, headers })
     : Response.json({ error: "토론 기록을 동기화하지 못했습니다. 서버 설정과 연결을 확인해주세요." }, { status: 503, headers });
 }
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
   const user = await requestSiteUser(request);
   if (!user) return unauthenticated();
   if (request.headers.get("x-prism-history-owner") !== user.id) return accountChanged();
-  try { return historyResponse(await getHistory(user.id)); }
+  try { return await relayHistoryRequest(request, user.id) ?? historyResponse(await getHistory(user.id)); }
   catch (error) { return failure(error); }
 }
 
@@ -69,7 +70,10 @@ async function mutate(request: Request, clear: boolean) {
   if (request.headers.get("x-prism-history-owner") !== user.id) return accountChanged();
   try {
     if (request.headers.get("origin") !== siteOrigin(request)) return Response.json({ error: "이 사이트에서 토론 기록을 변경해주세요." }, { status: 403, headers });
-    const input = await readJson(request);
+    const raw = await readJson(request);
+    const input = clear ? { generation: parseHistoryClear(raw) } : parseHistoryUpload(raw);
+    const relayed = await relayHistoryRequest(request, user.id, input);
+    if (relayed) return relayed;
     return historyResponse(await (clear ? clearHistory(user.id, input) : appendHistory(user.id, input)));
   } catch (error) { return failure(error); }
 }

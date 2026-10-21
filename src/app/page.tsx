@@ -10,6 +10,21 @@ import { PROVIDERS, type DebateEvent, type DebateMessage, type DebateMode, type 
 import { debateMarkdown, readSettings, type SavedDebate } from "@/lib/client-store";
 import { notifyDebateComplete } from "@/lib/pwa";
 import { useDebateHistory } from "@/lib/use-debate-history";
+import { useSiteUser } from "@/components/site-user-provider";
+import { DebateStartDialog } from "@/components/debate-start-dialog";
+import { prepareDebateStart, type DebateStartConfiguration, type PreparedDebateStart } from "@/lib/debate-start";
+import type { DebateRequest } from "@/lib/debate";
+
+type StartReview = {
+  topic: string;
+  position: string;
+  mode: DebateMode;
+  ownerId: string;
+  scope: object;
+  prepared: PreparedDebateStart | null;
+  loading: boolean;
+  error: string;
+};
 
 const EXAMPLES = [
   { category: "기술과 미래", topic: "AI는 인간의 창의성을 대체할 수 있을까?", position: "AI는 기존의 정보를 조합하는 데 뛰어나지만, 인간의 경험과 감정에서 나오는 창의성을 완전히 대체하기는 어렵다고 생각합니다." },
@@ -29,6 +44,7 @@ const PREVIEW = [
 ];
 
 export default function StudioPage() {
+  const user = useSiteUser();
   const [topic, setTopic] = useState("");
   const [position, setPosition] = useState("");
   const [mode, setMode] = useState<DebateMode>("live");
@@ -43,9 +59,11 @@ export default function StudioPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [liveReady, setLiveReady] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState("");
   const [usesChatGptPlan, setUsesChatGptPlan] = useState(false);
   const [usesGeminiLocal, setUsesGeminiLocal] = useState(false);
-  const [chatgptAccountId, setChatgptAccountId] = useState<string | undefined>();
+  const [startReview, setStartReview] = useState<StartReview | null>(null);
   const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
   const [completedRounds, setCompletedRounds] = useState<number[]>([]);
   const [exampleOffset, setExampleOffset] = useState(0);
@@ -53,24 +71,79 @@ export default function StudioPage() {
   const resultRef = useRef<HTMLElement>(null);
   const historyRef = useRef<HTMLDialogElement>(null);
   const openedHistoryLink = useRef(false);
+  const refreshConnectionsRef = useRef<() => void>(() => {});
+  const connectionScopeRef = useRef<object | null>(null);
+  const activeOwnerRef = useRef(user?.id);
+  const startReviewRef = useRef<StartReview | null>(null);
+  const reviewControllerRef = useRef<AbortController | null>(null);
+  activeOwnerRef.current = user?.id;
 
   useEffect(() => {
-    const settings = readSettings();
-    const usePlan = settings?.gptAuthMode === "chatgpt";
-    const useLocal = settings?.geminiAuthMode === "antigravity";
-    setUsesGeminiLocal(useLocal);
-    setUsesChatGptPlan(usePlan);
-    const enteredIds = PROVIDERS.filter(p => !(p.id === "gpt" && usePlan) && !(p.id === "gemini" && useLocal) && !!settings?.credentials[p.id]?.trim()).map(p => p.id);
-    fetch(useLocal ? "/api/debate?gemini=antigravity" : "/api/debate").then(r => r.json()).then(data => {
-      setChatgptAccountId(data.chatgptAccountId || undefined);
-      let available: ProviderId[] = [...new Set<ProviderId>([...(data.availableProviders || []), ...enteredIds])];
-      if (usePlan) { available = available.filter(id => id !== "gpt"); if (data.chatgptConnected) available.push("gpt"); }
-      if (useLocal) { available = available.filter(id => id !== "gemini"); if (data.geminiLocalReady) available.push("gemini"); }
-      setAvailableProviders(available);
-      setLiveReady(PROVIDERS.every(p => available.includes(p.id)));
-    }).catch(() => { setAvailableProviders(enteredIds); setLiveReady(enteredIds.length === 3); });
+    let disposed = false;
+    let pending: AbortController | null = null;
+    const scope = {}; connectionScopeRef.current = scope;
+    setRunning(false); setLiveReady(false); setAvailableProviders([]);
+    startReviewRef.current = null; setStartReview(null);
+    async function refresh() {
+      if (disposed || pending || document.visibilityState === "hidden") return;
+      if (!user?.id) { setConnectionLoading(false); setConnectionError("Google 계정으로 다시 로그인해주세요."); return; }
+      const settings = readSettings();
+      const usePlan = settings?.gptAuthMode === "chatgpt";
+      const useLocal = settings?.geminiAuthMode === "antigravity";
+      setUsesGeminiLocal(useLocal); setUsesChatGptPlan(usePlan);
+      setConnectionLoading(true); setLiveReady(false);
+      const controller = new AbortController(); pending = controller;
+      try {
+        const response = await fetch(useLocal ? "/api/debate?gemini=antigravity" : "/api/debate", {
+          headers: { "X-Prism-Api-Key-Owner": user.id }, cache: "no-store", credentials: "same-origin",
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "AI 연결 상태를 확인하지 못했습니다.");
+        if (typeof data.apiKeys?.enabled !== "boolean" || !Array.isArray(data.apiKeys.configuredProviders) || !Array.isArray(data.availableProviders)) {
+          throw new Error("AI 연결 상태를 확인하지 못했습니다. 새로고침 후 다시 시도해주세요.");
+        }
+        if (disposed) return;
+        const isProvider = (id: unknown): id is ProviderId => PROVIDERS.some(provider => provider.id === id);
+        const enteredIds = PROVIDERS.filter(provider => !(provider.id === "gpt" && usePlan) && !(provider.id === "gemini" && useLocal) && !!settings?.credentials[provider.id]?.trim()).map(provider => provider.id);
+        let available: ProviderId[] = data.apiKeys.enabled
+          ? data.apiKeys.configuredProviders.filter(isProvider)
+          : [...new Set<ProviderId>([...data.availableProviders.filter(isProvider), ...enteredIds])];
+        if (usePlan) { available = available.filter(id => id !== "gpt"); if (data.chatgptConnected) available.push("gpt"); }
+        if (useLocal) { available = available.filter(id => id !== "gemini"); if (data.geminiLocalReady) available.push("gemini"); }
+        setAvailableProviders(available); setLiveReady(PROVIDERS.every(provider => available.includes(provider.id))); setConnectionError("");
+      } catch (err) {
+        if (!disposed) {
+          setLiveReady(false); setAvailableProviders([]);
+          setConnectionError(err instanceof Error && !controller.signal.aborted ? err.message : "AI 연결 상태를 확인하지 못했습니다. 연결을 확인하고 다시 시도해주세요.");
+        }
+      } finally {
+        if (pending === controller) pending = null;
+        if (!disposed) setConnectionLoading(false);
+      }
+    }
+    const refreshIfVisible = () => { void refresh(); };
+    refreshConnectionsRef.current = refreshIfVisible;
+    refreshIfVisible();
+    const interval = setInterval(refreshIfVisible, 120_000);
+    window.addEventListener("focus", refreshIfVisible);
+    window.addEventListener("pageshow", refreshIfVisible);
+    window.addEventListener("online", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      disposed = true; pending?.abort(); controllerRef.current?.abort(); reviewControllerRef.current?.abort(); clearInterval(interval);
+      startReviewRef.current = null;
+      if (connectionScopeRef.current === scope) connectionScopeRef.current = null;
+      refreshConnectionsRef.current = () => {};
+      window.removeEventListener("focus", refreshIfVisible);
+      window.removeEventListener("pageshow", refreshIfVisible);
+      window.removeEventListener("online", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     if (new URLSearchParams(window.location.search).get("history") === "1") historyRef.current?.showModal();
-    return () => controllerRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -101,20 +174,85 @@ export default function StudioPage() {
     const example = EXAMPLES[index % EXAMPLES.length]; setTopic(example.topic); setPosition(example.position); setError("");
   }
 
-  async function startDebate(override?: typeof EXAMPLES[number]) {
-    if (controllerRef.current) return;
+  function closeStartReview() {
+    reviewControllerRef.current?.abort(); reviewControllerRef.current = null;
+    startReviewRef.current = null; setStartReview(null);
+  }
+
+  async function loadStartReview(review: StartReview) {
+    reviewControllerRef.current?.abort();
+    const controller = new AbortController(); reviewControllerRef.current = controller;
+    const pending = { ...review, prepared: null, loading: true, error: "" };
+    startReviewRef.current = pending; setStartReview(pending);
+    const current = () => startReviewRef.current === pending && !controller.signal.aborted && activeOwnerRef.current === pending.ownerId && connectionScopeRef.current === pending.scope;
+    try {
+      const settings = readSettings();
+      let configuration: DebateStartConfiguration;
+      if (pending.mode === "demo") {
+        configuration = { providers: [...PROVIDERS], availableProviders: [], missingProviders: [], liveAvailable: false, apiKeys: { enabled: false, configuredProviders: [] } };
+      } else {
+        const response = await fetch(settings?.geminiAuthMode === "antigravity" ? "/api/debate?gemini=antigravity" : "/api/debate", {
+          headers: { "X-Prism-Api-Key-Owner": pending.ownerId }, cache: "no-store",
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "AI 연결 설정을 확인하지 못했습니다.");
+        const isProvider = (id: unknown): id is ProviderId => PROVIDERS.some(provider => provider.id === id);
+        if (typeof data.apiKeys?.enabled !== "boolean" || !Array.isArray(data.apiKeys.configuredProviders) || !data.apiKeys.configuredProviders.every(isProvider)
+          || !Array.isArray(data.availableProviders) || !data.availableProviders.every(isProvider)
+          || !Array.isArray(data.providers) || !PROVIDERS.every(provider => data.providers.some((item: { id?: unknown; model?: unknown }) => item?.id === provider.id && typeof item.model === "string"))) {
+          throw new Error("AI 연결 설정을 확인하지 못했습니다. 다시 확인해주세요.");
+        }
+        configuration = data;
+      }
+      const prepared = prepareDebateStart(pending.topic, pending.position, pending.mode, settings, configuration);
+      if (!current()) return;
+      const ready = { ...pending, prepared, loading: false };
+      startReviewRef.current = ready; setStartReview(ready);
+    } catch (err) {
+      if (!current()) return;
+      const failed = { ...pending, loading: false, error: err instanceof Error && !["TypeError", "SyntaxError", "TimeoutError"].includes(err.name) ? err.message : "AI 연결 설정을 불러오지 못했습니다. 연결을 확인하고 다시 시도해주세요." };
+      startReviewRef.current = failed; setStartReview(failed);
+    } finally {
+      if (reviewControllerRef.current === controller) reviewControllerRef.current = null;
+    }
+  }
+
+  function reviewDebate() {
+    if (controllerRef.current || running || startReviewRef.current) return;
     if (historySync.clearing) { notify("기록 삭제가 끝난 뒤 시작해주세요."); return; }
-    const inputTopic = (override?.topic ?? topic).trim(); const inputPosition = (override?.position ?? position).trim();
+    const ownerId = user?.id;
+    const scope = connectionScopeRef.current;
+    if (!ownerId || !scope) { setError("Google 계정으로 다시 로그인해주세요."); return; }
+    const inputTopic = topic.trim();
     if (!inputTopic) { setError("토론 주제를 입력해주세요."); return; }
-    const selectedMode = override ? "demo" : mode;
-    if (selectedMode === "live" && !liveReady) { setError("설정에서 GPT·Claude·Gemini 연결 설정을 마친 후 시작해주세요."); return; }
-    if (override) { setTopic(inputTopic); setPosition(inputPosition); setMode("demo"); }
+    setError("");
+    void loadStartReview({ topic: inputTopic, position: position.trim(), mode, ownerId, scope, prepared: null, loading: true, error: "" });
+  }
+
+  function confirmDebate() {
+    const review = startReviewRef.current;
+    if (!review?.prepared?.ready || review.loading || review.error || controllerRef.current) return;
+    if (activeOwnerRef.current !== review.ownerId || connectionScopeRef.current !== review.scope) {
+      closeStartReview(); setError("로그인 계정이 변경되었습니다. 페이지를 새로고침해주세요."); return;
+    }
+    closeStartReview();
+    void startDebate(review.prepared.request, review.ownerId, review.scope);
+  }
+
+  async function startDebate(input: DebateRequest, ownerId: string, scope: object) {
+    if (controllerRef.current || activeOwnerRef.current !== ownerId || connectionScopeRef.current !== scope) return;
+    const stillCurrent = () => activeOwnerRef.current === ownerId && connectionScopeRef.current === scope;
+    if (historySync.clearing) { notify("기록 삭제가 끝난 뒤 시작해주세요."); return; }
+    const inputTopic = input.topic; const inputPosition = input.position; const selectedMode = input.mode;
+    setTopic(inputTopic); setPosition(inputPosition); setMode(selectedMode);
     setMessages([]); setResult(null); setError(""); setRunning(true); setActiveRound(1); setCurrentRound(1); setCompletedRounds([]);
     const controller = new AbortController(); controllerRef.current = controller;
     let debateId = crypto.randomUUID() as string; const collected: DebateMessage[] = []; let status: SavedDebate["status"] = "error"; let receivedComplete = false;
     const createdAt = new Date().toISOString();
     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     function onEvent(event: DebateEvent) {
+      if (!stillCurrent()) return;
       if (event.type === "start") debateId = event.debateId;
       if (event.type === "round-start") { setCurrentRound(event.round); setActiveRound(event.round); }
       if (event.type === "message") { collected.push(event.message); setMessages([...collected]); }
@@ -123,13 +261,15 @@ export default function StudioPage() {
       if (event.type === "error") throw new Error(event.message);
     }
     try {
-      const settings = readSettings();
-      const response = await fetch("/api/debate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: inputTopic, position: inputPosition, mode: selectedMode, ...(selectedMode === "live" ? { credentials: settings ? { ...settings.credentials, ...(settings.gptAuthMode === "chatgpt" ? { gpt: "" } : {}), ...(settings.geminiAuthMode === "antigravity" ? { gemini: "" } : {}) } : undefined, models: settings?.models, gptAuthMode: settings?.gptAuthMode, geminiAuthMode: settings?.geminiAuthMode, gptAccountId: settings?.gptAuthMode === "chatgpt" ? chatgptAccountId : undefined } : {}) }), signal: controller.signal });
-      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "토론 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."); }
+      // Execute the same models and connection modes that the user reviewed.
+      const response = await fetch("/api/debate", { method: "POST", headers: { "Content-Type": "application/json", "X-Prism-Api-Key-Owner": ownerId }, body: JSON.stringify(input), signal: controller.signal });
+      if (!stillCurrent()) { await response.body?.cancel(); return; }
+      if (!response.ok) { const data = await response.json().catch(() => ({})); refreshConnectionsRef.current(); throw new Error(data.error || "토론 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."); }
       if (!response.body) throw new Error("응답 스트림을 열 수 없습니다.");
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
+        if (!stillCurrent()) { await reader.cancel(); return; }
         buffer += decoder.decode(value, { stream: !done });
         const lines = buffer.split("\n"); buffer = lines.pop() || "";
         for (const line of lines) if (line.trim()) onEvent(JSON.parse(line));
@@ -139,16 +279,20 @@ export default function StudioPage() {
       if (!receivedComplete) throw new Error("연결이 일찍 종료되었습니다. 수신한 발언은 기록에 저장됩니다.");
       if (status === "error") setError("일부 AI가 응답하지 못했습니다. 각 카드의 안내를 확인하고 다시 시도해주세요.");
     } catch (err) {
+      if (!stillCurrent()) return;
       if (controller.signal.aborted) { status = "stopped"; notify("토론을 중지했습니다. 수신한 발언은 기록에 남습니다."); }
       else setError(err instanceof Error ? err.message : "토론 중 오류가 발생했습니다.");
     } finally {
-      controllerRef.current = null; setRunning(false);
-      const debate: SavedDebate = { id: debateId, topic: inputTopic, position: inputPosition, mode: selectedMode, createdAt, messages: collected, status };
-      setResult(debate);
-      if (collected.length) {
-        void historySync.save(debate).catch(() => notify("기록 동기화를 완료하지 못했습니다. 기록 창에서 상태를 확인해주세요."));
+      if (controllerRef.current === controller) controllerRef.current = null;
+      if (stillCurrent()) {
+        setRunning(false);
+        const debate: SavedDebate = { id: debateId, topic: inputTopic, position: inputPosition, mode: selectedMode, createdAt, messages: collected, status };
+        setResult(debate);
+        if (collected.length) {
+          void historySync.save(debate).catch(() => notify("기록 동기화를 완료하지 못했습니다. 기록 창에서 상태를 확인해주세요."));
+        }
+        if (receivedComplete && debate.status === "complete") void notifyDebateComplete(inputTopic, debateId);
       }
-      if (receivedComplete && debate.status === "complete") void notifyDebateComplete(inputTopic, debateId);
     }
   }
 
@@ -170,7 +314,7 @@ export default function StudioPage() {
       <div className="page-inner">
         <section className="hero"><div><div className="eyebrow"><span/>A SPACE FOR BETTER THINKING</div><h1>AI의 <span>시선</span></h1><p>서로 다른 AI의 생각이 만나, 당신의 관점이 더 깊어집니다.</p></div><div className="hero-symbol" aria-hidden="true"><PrismSymbol className="hero-prism"/></div></section>
         <div className="setup-grid">
-          <form className="composer-card" onSubmit={e => { e.preventDefault(); void startDebate(); }}>
+          <form className="composer-card" onSubmit={e => { e.preventDefault(); reviewDebate(); }}>
             <div className="card-heading"><span className="heading-icon"><MessageSquareText size={18}/></span><span className="input-step">01 / START</span></div>
             <div className="topic-field"><label htmlFor="topic">토론 주제 <span>*</span></label><input id="topic" placeholder="" value={topic} onChange={e => setTopic(e.target.value)} maxLength={180} disabled={running} required autoComplete="off"/></div>
             <div className="position-field"><div className="field-label-row"><label htmlFor="position">나의 입론 (선택)</label></div><textarea id="position" placeholder="" value={position} onChange={e => setPosition(e.target.value)} maxLength={4000} disabled={running}/><span className="char-count">{position.length.toLocaleString()} / 4,000</span></div>
@@ -178,7 +322,7 @@ export default function StudioPage() {
           </form>
           <aside className="participants-card"><div className="panel-heading"><h2>토론 패널</h2><span>3 PARTICIPANTS</span></div><div className="provider-list">{PROVIDERS.map(provider => <div className="provider-row" key={provider.id}><ProviderMark id={provider.id}/><div className="provider-info"><strong>{provider.name}<span>{provider.company}</span></strong><p>{{ gpt: "논리적 분석과 균형 잡힌 시각", claude: "깊이 있는 사고와 섬세한 해석", gemini: "다각적 탐색과 새로운 연결" }[provider.id]}</p></div><span className="participant-status" title={mode === "demo" ? "데모 패널" : availableProviders.includes(provider.id) ? "연결 설정됨" : "연결 설정 필요"}><span/></span></div>)}</div><div className="panel-note"><span className="note-stars"><Sparkles size={17}/></span></div></aside>
         </div>
-        {mode === "live" && !liveReady && <div className="inline-notice"><Settings2 size={16}/><span>실제 토론을 시작하려면 GPT·Claude·Gemini 연결 설정이 필요합니다.</span><Link href="/settings">설정하러 가기<ArrowUpRight size={13}/></Link></div>}
+        {mode === "live" && !liveReady && <div className="inline-notice" role="status"><Settings2 size={16}/><span>{connectionError || (connectionLoading ? "AI 연결 상태를 확인하고 있습니다." : "실제 토론을 시작하려면 GPT·Claude·Gemini 연결 설정이 필요합니다.")}</span>{connectionError && <button type="button" className="text-button" disabled={connectionLoading} onClick={() => refreshConnectionsRef.current()}><RotateCcw size={13}/>다시 시도</button>}<Link href="/settings">설정하러 가기<ArrowUpRight size={13}/></Link></div>}
         {error && <div className="error-notice" role="alert"><span>{error}</span><button className="icon-button" onClick={() => setError("")} aria-label="오류 닫기"><X size={16}/></button></div>}
         {(usesChatGptPlan || usesGeminiLocal) && mode === "live" && <div className="inline-notice"><Check size={15}/><span>GPT: {usesChatGptPlan ? "ChatGPT 플랜" : "API"} · Claude: API · Gemini: {usesGeminiLocal ? "로컬 Antigravity 플랜" : "API"} 사용량이 적용됩니다.</span><Link href="/settings">연결 관리<ArrowUpRight size={13}/></Link></div>}
         <section className="flow-section"><div className="section-heading"><div><h2>생각이 깊어지는 3개의 라운드<span className="subtle-dot">.</span></h2></div><span className="flow-count"><Layers3 size={14}/>3 rounds<span>·</span>9 perspectives</span></div><div className="round-flow">{ROUND_INFO.map((round, i) => <div key={round.id} className={`round-step ${hasResults && currentRound === round.id ? "current" : ""}`}><div className="round-step-top"><span className="round-number">0{round.id}</span><span className="round-en">{round.en}</span><round.icon size={20}/></div><h3>{round.title}</h3><p>{round.detail}</p>{i < 2 && <span className="step-connector"><ChevronRight size={15}/></span>}</div>)}</div></section>
@@ -240,13 +384,16 @@ export default function StudioPage() {
             })}</div>
             {result && <div className="completion-note"><CheckCheck
                 size={17}/><span>{result.status === "complete" ? "서로 다른 관점이 당신의 다음 생각으로 이어지길 바랍니다." : "수신한 발언을 확인하거나 같은 주제로 토론을 다시 시작할 수 있습니다."}</span>
-              <button className="text-button" onClick={() => void startDebate()}><RotateCcw size={13}/>다시 토론하기</button>
+              <button className="text-button" onClick={reviewDebate}><RotateCcw size={13}/>다시 토론하기</button>
             </div>}</> : <>
           </>}
         </section>
         <footer className="page-footer"><span>서로 다른 생각이 만나는 곳, <strong>prism.</strong></span><span>Powered by curiosity<span className="footer-star">✳</span></span></footer>
       </div>
     </main>
+    <DebateStartDialog open={!!startReview} loading={startReview?.loading ?? false} error={startReview?.error || ""} mode={startReview?.mode || mode} topic={startReview?.topic || ""}
+      participants={startReview?.prepared?.participants || []} onClose={closeStartReview} onConfirm={confirmDebate}
+      onRetry={() => { if (startReviewRef.current) void loadStartReview(startReviewRef.current); }}/>
     <dialog ref={historyRef} className="history-dialog" aria-labelledby="history-title">
       <div className="dialog-header"><div><span className="eyebrow">YOUR PERSPECTIVES</span><h2 id="history-title">나의 토론 기록</h2></div><button className="icon-button" onClick={() => historyRef.current?.close()} aria-label="기록 닫기"><X size={20}/></button></div>
       <p className="dialog-description">{historySync.enabled ? "같은 Google 계정으로 로그인한 기기에서 최근 30개의 토론을 이어 볼 수 있습니다." : historySync.enabled === false ? "이 브라우저에 최근 30개의 토론이 저장됩니다." : "최근 토론과 계정 동기화 상태를 확인하고 있습니다."}</p>

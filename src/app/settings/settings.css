@@ -4,6 +4,7 @@
 
 .settings-test-notice{display:flex;align-items:flex-start;gap:7px;margin:-5px 2px 19px;color:var(--muted);font-size:10px;line-height:1.8}
 .settings-test-notice>svg{margin-top:2px;flex-shrink:0;color:var(--muted)}
+.settings-edit-fields{min-width:0;margin:0;padding:0;border:0}.settings-sync-notice{display:flex;align-items:flex-start;gap:9px;margin:0 0 20px;padding:14px 16px;border:1px solid var(--accent-border);border-radius:9px;background:var(--accent-soft);color:var(--accent-text)}.settings-sync-notice>svg{flex-shrink:0;margin-top:1px}.settings-sync-notice>div{min-width:0;flex:1}.settings-sync-notice strong{font-size:11px;font-weight:600}.settings-sync-notice p{margin:5px 0 0;font-size:10px;line-height:1.8;color:var(--text);overflow-wrap:anywhere}.settings-sync-notice.is-error{border-color:var(--danger-border);background:var(--danger-soft);color:var(--danger)}.settings-sync-notice button{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex-shrink:0;min-height:32px;padding:5px 9px;border:1px solid currentColor;border-radius:5px;font-size:10px}.settings-key-help-row{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}.settings-key-help-row .settings-field-help{min-width:0;flex:1}.settings-key-remove{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;min-height:28px;margin-top:3px;padding:3px 0;border:0;background:transparent;color:var(--danger);font-size:9px}.settings-key-remove:disabled{opacity:.5;cursor:not-allowed}
 .settings-connection-test{display:flex;align-items:center;justify-content:space-between;gap:15px;border-top:1px solid var(--border);margin-top:18px;padding-top:15px;min-height:49px}
 .settings-test-result{display:flex;align-items:center;gap:8px;min-width:0;font-size:10px;color:var(--muted);line-height:1.8;overflow-wrap:anywhere}
 .settings-test-result>svg{flex-shrink:0}
@@ -51,6 +52,7 @@
 @media(max-width:850px){.settings-field>input,.settings-key-input input,.settings-model-select select,.chatgpt-account-label select{font-size:16px}}
 
 @media (max-width: 850px) {
+  .settings-sync-notice{flex-wrap:wrap;padding:16px;gap:10px}.settings-sync-notice strong{font-size:14px;line-height:1.7}.settings-sync-notice p{font-size:13px;line-height:1.8}.settings-sync-notice button{min-height:44px;margin-left:auto;padding:8px 12px;font-size:13px}.settings-key-help-row{flex-wrap:wrap;gap:0}.settings-key-help-row .settings-field-help{flex-basis:100%}.settings-key-remove{min-height:44px;margin-left:auto;font-size:13px;gap:6px}
   .settings-shell .mobile-menu { display: inline-flex; }
   .settings-content {
     padding: 28px max(18px, env(safe-area-inset-right, 0px))

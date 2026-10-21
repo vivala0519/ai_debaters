@@ -111,7 +111,7 @@ export function getConfiguration(): DebateConfiguration {
   };
 }
 
-export function resolveSettings(input: DebateRequest, planAccessToken?: string, localCliAllowed = false) {
+export function resolveSettings(input: DebateRequest, planAccessToken?: string, localCliAllowed = false, allowEnvironmentKeys = true) {
   const configuration = getConfiguration();
   const credentials: Record<ProviderId, string> = { gpt: "", claude: "", gemini: "" };
   const providers = configuration.providers.map((provider) => ({ ...provider, model: input.models?.[provider.id] || provider.model }));
@@ -128,7 +128,7 @@ export function resolveSettings(input: DebateRequest, planAccessToken?: string, 
         credentials.gpt = planAccessToken;
         continue;
       }
-      const key = input.credentials?.[provider.id] || process.env[ENV_KEYS[provider.id]]?.trim() || "";
+      const key = input.credentials?.[provider.id] || (allowEnvironmentKeys ? process.env[ENV_KEYS[provider.id]]?.trim() : "") || "";
       if (!key) throw new InputError(`${provider.name} API 키를 설정에서 입력해 주세요.`, 422);
       if (key.length > 1024 || !/^[\x21-\x7E]+$/.test(key)) throw new InputError(`${provider.name} API 키 형식을 확인해 주세요.`, 422);
       credentials[provider.id] = key;

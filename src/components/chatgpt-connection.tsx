@@ -11,7 +11,7 @@ type Props = {
   onStatusChange: (status: ChatGptStatus | null) => void;
   onModelsChange: (models: ChatGptModel[]) => void;
   onModelChange: (model: string) => void;
-  onBeforeSignIn: () => boolean;
+  onBeforeSignIn: () => boolean | Promise<boolean>;
 };
 
 export function ChatGptConnection({ mode, selectedModel, onModeChange, onStatusChange, onModelsChange, onModelChange, onBeforeSignIn }: Props) {
@@ -73,9 +73,10 @@ export function ChatGptConnection({ mode, selectedModel, onModeChange, onStatusC
   }
 
   async function signIn(addAccount = false) {
-    if (busy || !onBeforeSignIn()) return;
+    if (busy) return;
     setBusy(true); setError("");
     try {
+      if (!await onBeforeSignIn()) { setBusy(false); return; }
       const data = await action("start", addAccount ? undefined : status?.activeAccountId || undefined);
       const url = new URL(data.url);
       if (url.origin !== "https://auth.openai.com" || url.pathname !== "/api/accounts/authorize") throw new Error("로그인 주소가 올바르지 않습니다.");

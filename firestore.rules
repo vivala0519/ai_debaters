@@ -6,6 +6,10 @@ service cloud.firestore {
     match /prismHistory/{document=**} {
       allow read, write: if false;
     }
+    // API keys are encrypted and accessed only by the authenticated server API.
+    match /prismApiKeys/{document=**} {
+      allow read, write: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
