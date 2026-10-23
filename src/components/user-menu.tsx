@@ -2,7 +2,7 @@
 
 import { LogOut } from "lucide-react";
 import { useSiteUser } from "./site-user-provider";
-import { settingsStorageKey } from "@/lib/client-store";
+import { prefsStorageKey, settingsStorageKey } from "@/lib/client-store";
 import { useState } from "react";
 import { logoutFirebase } from "@/lib/firebase-client";
 
@@ -18,7 +18,7 @@ export function UserMenu() {
       setBusy(true); setError("");
       try {
         await logoutFirebase();
-        try { sessionStorage.removeItem(settingsStorageKey()); } catch { /* Browser storage may be unavailable. */ }
+        try { sessionStorage.removeItem(settingsStorageKey()); localStorage.removeItem(prefsStorageKey()); } catch { /* Browser storage may be unavailable. */ }
         window.location.replace("/login");
       } catch { setError("로그아웃하지 못했습니다. 다시 시도해주세요."); setBusy(false); }
     }}><LogOut size={17}/></button>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle, ArrowLeft, ArrowUpRight, Check, CheckCircle2, ChevronDown, Cloud, Eye, EyeOff, KeyRound, LoaderCircle, LockKeyhole, Menu, PlugZap, RefreshCw, RotateCcw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { ProviderMark } from "@/components/brand";
-import { readSettings, settingsStorageKey, type ApiSettings } from "@/lib/client-store";
+import { prefsStorageKey, readSettings, savePrefs, settingsStorageKey, type ApiSettings } from "@/lib/client-store";
 import { PROVIDERS, type ProviderId } from "@/lib/debate";
 import { getModelOptions } from "@/lib/model-options";
 import type { ConnectionTestRequest, ConnectionTestResponse } from "@/lib/connection-test";
@@ -104,7 +104,7 @@ export default function SettingsPage() {
     // overwriting other, unsaved form edits.
     const saved = readSettings();
     if (saved?.gptAuthMode === "chatgpt" && owner.current?.storageKey === settingsStorageKey()) {
-      try { sessionStorage.setItem(owner.current.storageKey, JSON.stringify({ ...saved, models: { ...saved.models, gpt: model } })); }
+      try { sessionStorage.setItem(owner.current.storageKey, JSON.stringify({ ...saved, models: { ...saved.models, gpt: model } })); savePrefs({ ...saved, models: { ...saved.models, gpt: model } }); }
       catch { /* The normal save button reports storage failures. */ }
     }
     setDirty(true); setStatus(null);
@@ -242,7 +242,7 @@ export default function SettingsPage() {
         normalized.credentials = { gpt: "", claude: "", gemini: "" };
       }
       if (owner.current !== account || settingsStorageKey() !== account.storageKey) return false;
-      try { sessionStorage.setItem(account.storageKey, JSON.stringify(normalized)); }
+      try { sessionStorage.setItem(account.storageKey, JSON.stringify(normalized)); savePrefs(normalized); }
       catch { throw new Error(cloud.enabled ? "API 키는 계정에 저장했지만, 모델과 연결 방식은 브라우저에 저장하지 못했습니다. 브라우저 설정을 확인해 주세요." : "브라우저가 세션 저장을 허용하지 않습니다. 브라우저 설정을 확인해 주세요."); }
       setSettings(normalized);
       setDirty(false);
@@ -270,7 +270,7 @@ export default function SettingsPage() {
         setCloud(data);
       }
       if (owner.current !== account || settingsStorageKey() !== account.storageKey) return;
-      try { sessionStorage.removeItem(account.storageKey); }
+      try { sessionStorage.removeItem(account.storageKey); localStorage.removeItem(prefsStorageKey()); }
       catch { throw new Error(cloud.enabled ? "계정의 API 키는 삭제했지만 브라우저 설정은 지우지 못했습니다. 브라우저 설정을 확인해 주세요." : "저장한 설정을 지우지 못했습니다. 브라우저 설정을 확인해 주세요."); }
       for (const controller of Object.values(testControllers.current)) controller?.abort();
       testControllers.current = {};
