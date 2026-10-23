@@ -28,7 +28,9 @@ export async function POST(request: Request) {
     const response = NextResponse.json({ user: identity.user }, { headers });
     const maxAge = Math.max(1, Math.min(3600, identity.expiresAt - Math.floor(Date.now() / 1000)));
     response.cookies.set(sessionCookieName(origin), idToken, cookieOptions(origin, maxAge));
-    if (previousUser?.id !== identity.user.id && readCookie(request, "agora_chatgpt_session")) response.cookies.set("agora_chatgpt_session", "", cookieOptions(origin, 0));
+    // Only clear on an actual account switch; an expired site cookie (e.g. after the
+    // local server was off for over an hour) must not drop the ChatGPT plan session.
+    if (previousUser && previousUser.id !== identity.user.id && readCookie(request, "agora_chatgpt_session")) response.cookies.set("agora_chatgpt_session", "", cookieOptions(origin, 0));
     return response;
   } catch { return Response.json({ error: "Google 계정으로 다시 로그인해주세요." }, { status: 401, headers }); }
 }

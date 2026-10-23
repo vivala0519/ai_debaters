@@ -14,13 +14,20 @@ export const SETTINGS_KEY = "agora-api-settings-v1";
 export const HISTORY_KEY = "agora-debates-v1";
 const scopedKey = (key: string) => `${key}:${typeof document !== "undefined" ? document.documentElement.dataset.userKey || "signed-out" : "signed-out"}`;
 export const settingsStorageKey = () => scopedKey(SETTINGS_KEY);
+// Connection modes and models (never API keys) persist across browser restarts.
+export const PREFS_KEY = "agora-connection-prefs-v1";
+export const prefsStorageKey = () => scopedKey(PREFS_KEY);
+export function savePrefs(settings: ApiSettings) {
+  try { localStorage.setItem(prefsStorageKey(), JSON.stringify({ models: settings.models, gptAuthMode: settings.gptAuthMode, geminiAuthMode: settings.geminiAuthMode })); } catch { /* Optional. */ }
+}
 export const historyStorageKey = () => scopedKey(HISTORY_KEY);
 
 export function readSettings(): ApiSettings | null {
   try {
     const raw = sessionStorage.getItem(settingsStorageKey());
-    if (!raw) return null;
-    const data = JSON.parse(raw);
+    const prefs = raw ? null : localStorage.getItem(prefsStorageKey());
+    if (!raw && !prefs) return null;
+    const data = raw ? JSON.parse(raw) : { ...JSON.parse(prefs!), credentials: { gpt: "", claude: "", gemini: "" } };
     const ids: ProviderId[] = ["gpt", "claude", "gemini"];
     if (!data.credentials || !data.models || !ids.every(id => typeof data.credentials[id] === "string" && typeof data.models[id] === "string")) return null;
     if (data.gptAuthMode !== undefined && data.gptAuthMode !== "api-key" && data.gptAuthMode !== "chatgpt") return null;
